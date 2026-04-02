@@ -40,7 +40,7 @@ exports.getForm = async (req, res) => {
     const user = await User.findById(req.user._id);
     const profile = user.profile || {};
     
-    // Add phoneNumber to profile object for mapping
+    // Add phoneNumber to profile for mapping
     const fullProfile = {
       ...profile,
       phoneNumber: user.phoneNumber
@@ -51,10 +51,17 @@ exports.getForm = async (req, res) => {
       let value = null;
       let autoFilled = false;
 
+      // Try mapping with profileKey first
       if (field.profileKey) {
-        // Handle nested keys like 'address.city'
         value = getNestedValue(fullProfile, field.profileKey);
-        
+        if (value !== null && value !== undefined) {
+          autoFilled = true;
+        }
+      }
+      
+      // If not found, try direct field.id lookup
+      if (!autoFilled) {
+        value = fullProfile[field.id];
         if (value !== null && value !== undefined) {
           autoFilled = true;
         }
@@ -73,6 +80,8 @@ exports.getForm = async (req, res) => {
     // Calculate auto-fill percentage
     const autoFilledCount = filledFields.filter(f => f.autoFilled).length;
     const autoFillPercentage = Math.round((autoFilledCount / filledFields.length) * 100);
+
+    console.log(`📊 Form ${req.params.formId}: ${autoFilledCount}/${filledFields.length} auto-filled (${autoFillPercentage}%)`);
 
     res.json({
       success: true,

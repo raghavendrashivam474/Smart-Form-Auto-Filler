@@ -16,9 +16,11 @@ class _FormsListScreenState extends State<FormsListScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      context.read<FormsProvider>().loadForms();
-    });
+    _loadForms();
+  }
+
+  Future<void> _loadForms() async {
+    await context.read<FormsProvider>().loadForms();
   }
 
   @override
@@ -38,7 +40,7 @@ class _FormsListScreenState extends State<FormsListScreen> {
         }
 
         return RefreshIndicator(
-          onRefresh: () => formsProvider.loadForms(),
+          onRefresh: _loadForms,
           child: ListView.builder(
             padding: const EdgeInsets.all(AppConstants.spacingM),
             itemCount: formsProvider.forms.length,
@@ -46,13 +48,19 @@ class _FormsListScreenState extends State<FormsListScreen> {
               final form = formsProvider.forms[index];
               return Card(
                 child: InkWell(
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    // Navigate and wait for result
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => FormFillScreen(formId: form.formId),
                       ),
                     );
+                    
+                    // Reload forms after returning to refresh auto-fill stats
+                    if (mounted) {
+                      _loadForms();
+                    }
                   },
                   borderRadius: BorderRadius.circular(AppConstants.radiusL),
                   child: Padding(

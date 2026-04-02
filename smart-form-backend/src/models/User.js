@@ -8,15 +8,8 @@ const userSchema = new mongoose.Schema({
     trim: true,
   },
   profile: {
-    fullName: String,
-    email: String,
-    dateOfBirth: Date,
-    address: {
-      street: String,
-      city: String,
-      state: String,
-      pincode: String,
-    },
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
   },
   isActive: {
     type: Boolean,
@@ -24,6 +17,7 @@ const userSchema = new mongoose.Schema({
   },
 }, {
   timestamps: true,
+  strict: false,
 });
 
 module.exports = mongoose.model('User', userSchema);

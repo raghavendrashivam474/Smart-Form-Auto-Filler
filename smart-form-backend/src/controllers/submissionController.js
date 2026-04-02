@@ -31,17 +31,29 @@ exports.submitForm = async (req, res) => {
     // Track field usage (adaptive learning)
     await FieldTrackerService.trackFields(form.fields);
 
-    // Update user profile
+    // ✨ ENHANCED: Save ALL form data to profile for future auto-fill
     const profileUpdates = {};
+    
     Object.keys(data).forEach(key => {
       const field = form.fields.find(f => f.id === key);
-      if (field && field.profileKey && data[key]) {
-        profileUpdates['profile.' + field.profileKey] = data[key];
+      
+      if (data[key]) {
+        if (field && field.profileKey) {
+          // Has explicit mapping - use it
+          profileUpdates['profile.' + field.profileKey] = data[key];
+        } else {
+          // No mapping - save with field ID as key
+          profileUpdates['profile.' + key] = data[key];
+        }
       }
     });
 
     if (Object.keys(profileUpdates).length > 0) {
-      await User.findByIdAndUpdate(req.user._id, profileUpdates);
+      await User.findByIdAndUpdate(req.user._id, {
+        $set: profileUpdates
+      });
+      console.log('✅ Profile updated with', Object.keys(profileUpdates).length, 'fields');
+      console.log('📝 Updated fields:', Object.keys(profileUpdates));
     }
 
     res.status(201).json({
@@ -50,6 +62,7 @@ exports.submitForm = async (req, res) => {
       data: submission,
     });
   } catch (error) {
+    console.error('❌ Submission error:', error);
     res.status(500).json({
       success: false,
       message: error.message,

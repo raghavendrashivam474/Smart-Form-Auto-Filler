@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # smart_form_filler
 
 A new Flutter project.
@@ -15,3 +16,7 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# Smart-Form-Auto-Filler
+Fill once. Use everywhere.  Smart Form Auto-Filler helps users eliminate repetitive form filling by intelligently reusing personal data and documents. Built with a dynamic form engine, auto-fill logic, and adaptive learning system.
+>>>>>>> 6686af5e47e28224d964a022b7c144d93ba31014

@@ -2,6 +2,9 @@
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../auth/providers/auth_provider.dart';
+import '../profile/providers/profile_provider.dart';
+import '../forms/providers/forms_provider.dart';
+import '../submissions/providers/submissions_provider.dart';
 import '../profile/screens/profile_screen.dart';
 import '../forms/screens/forms_list_screen.dart';
 import '../submissions/screens/submissions_screen.dart';
@@ -17,6 +20,42 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // Load initial data
+    _loadData();
+  }
+
+  void _loadData() {
+    Future.microtask(() {
+      context.read<FormsProvider>().loadForms();
+      context.read<ProfileProvider>().loadProfile();
+      context.read<SubmissionsProvider>().loadSubmissions();
+    });
+  }
+
+  void _onTabChanged(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+
+    // Refresh data when switching tabs
+    Future.microtask(() {
+      switch (index) {
+        case 0:
+          context.read<FormsProvider>().loadForms();
+          break;
+        case 1:
+          context.read<SubmissionsProvider>().loadSubmissions();
+          break;
+        case 2:
+          context.read<ProfileProvider>().loadProfile();
+          break;
+      }
+    });
+  }
+
   final List<Widget> _screens = [
     const FormsListScreen(),
     const SubmissionsScreen(),
@@ -27,30 +66,61 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppConstants.appName),
+        title: Text(_getTitle()),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _loadData();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Refreshed'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              final authProvider = context.read<AuthProvider>();
-              await authProvider.logout();
-              if (mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true && mounted) {
+                final authProvider = context.read<AuthProvider>();
+                await authProvider.logout();
+                if (mounted) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                }
               }
             },
           ),
         ],
       ),
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onDestinationSelected: _onTabChanged,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.description_outlined),
@@ -70,5 +140,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  String _getTitle() {
+    switch (_currentIndex) {
+      case 0:
+        return 'Available Forms';
+      case 1:
+        return 'My Submissions';
+      case 2:
+        return 'My Profile';
+      default:
+        return AppConstants.appName;
+    }
   }
 }

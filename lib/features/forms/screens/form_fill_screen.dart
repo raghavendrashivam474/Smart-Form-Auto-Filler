@@ -6,7 +6,6 @@ import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../providers/forms_provider.dart';
 import '../../submissions/providers/submissions_provider.dart';
-import '../../submissions/screens/submissions_screen.dart';
 
 class FormFillScreen extends StatefulWidget {
   final String formId;
@@ -20,13 +19,28 @@ class FormFillScreen extends StatefulWidget {
 class _FormFillScreenState extends State<FormFillScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      context.read<FormsProvider>().loadForm(widget.formId);
-    });
+    _loadForm();
+  }
+
+  Future<void> _loadForm() async {
+    await context.read<FormsProvider>().loadForm(widget.formId);
+    final form = context.read<FormsProvider>().currentForm;
+    
+    if (form != null) {
+      for (var field in form.fields) {
+        if (!_controllers.containsKey(field.id)) {
+          _controllers[field.id] = TextEditingController(
+            text: field.value?.toString() ?? '',
+          );
+        }
+      }
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -39,39 +53,75 @@ class _FormFillScreenState extends State<FormFillScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      final formsProvider = context.read<FormsProvider>();
-      final submissionsProvider = context.read<SubmissionsProvider>();
+      setState(() => _isSubmitting = true);
 
-      final formData = formsProvider.getFormData();
+      try {
+        final formsProvider = context.read<FormsProvider>();
+        final submissionsProvider = context.read<SubmissionsProvider>();
 
-      final submission = await submissionsProvider.submitForm(
-        widget.formId,
-        formData,
-      );
+        // Get form data
+        final formData = formsProvider.getFormData();
 
-      if (submission != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Form submitted successfully!'),
-            backgroundColor: AppConstants.successColor,
-          ),
+        // Submit form
+        final submission = await submissionsProvider.submitForm(
+          widget.formId,
+          formData,
         );
 
-        // Generate PDF
-        await submissionsProvider.generatePDF(submission.id);
+        if (submission != null && mounted) {
+          // Generate PDF
+          await submissionsProvider.generatePDF(submission.id);
 
+          // Navigate back to forms list
+          Navigator.of(context).pop();
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '✅ PDF Generated Successfully!',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppConstants.successColor,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+
+          // Reload forms to show updated data
+          formsProvider.loadForms();
+        } else {
+          throw Exception('Submission failed');
+        }
+      } catch (e) {
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const SubmissionsScreen()),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Error: ${e.toString()}'),
+              backgroundColor: AppConstants.errorColor,
+              duration: const Duration(seconds: 3),
+            ),
           );
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(submissionsProvider.error ?? 'Submission failed'),
-            backgroundColor: AppConstants.errorColor,
-          ),
-        );
+      } finally {
+        if (mounted) {
+          setState(() => _isSubmitting = false);
+        }
       }
     }
   }
@@ -91,15 +141,6 @@ class _FormFillScreenState extends State<FormFillScreen> {
           final form = formsProvider.currentForm;
           if (form == null) {
             return const Center(child: Text('Form not found'));
-          }
-
-          // Initialize controllers
-          for (var field in form.fields) {
-            if (!_controllers.containsKey(field.id)) {
-              _controllers[field.id] = TextEditingController(
-                text: field.value?.toString() ?? '',
-              );
-            }
           }
 
           return Column(
@@ -138,7 +179,7 @@ class _FormFillScreenState extends State<FormFillScreen> {
                               ),
                             ),
                             Text(
-                              '${form.stats!.autoFilled} of ${form.stats!.totalFields} fields pre-filled',
+                              '${form.stats!.autoFilled} of ${form.stats!.totalFields} fields',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -180,15 +221,11 @@ class _FormFillScreenState extends State<FormFillScreen> {
                   ],
                 ),
                 child: SafeArea(
-                  child: Consumer<SubmissionsProvider>(
-                    builder: (context, submissionsProvider, _) {
-                      return CustomButton(
-                        text: 'Submit Form',
-                        onPressed: _submitForm,
-                        isLoading: submissionsProvider.isLoading,
-                        icon: Icons.send,
-                      );
-                    },
+                  child: CustomButton(
+                    text: _isSubmitting ? 'Submitting...' : 'Submit Form',
+                    onPressed: _isSubmitting ? () {} : _submitForm,
+                    isLoading: _isSubmitting,
+                    icon: Icons.send,
                   ),
                 ),
               ),
@@ -200,6 +237,12 @@ class _FormFillScreenState extends State<FormFillScreen> {
   }
 
   Widget _buildFormField(dynamic field, FormsProvider formsProvider) {
+    if (!_controllers.containsKey(field.id)) {
+      _controllers[field.id] = TextEditingController(
+        text: field.value?.toString() ?? '',
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppConstants.spacingM),
       child: Column(
@@ -255,17 +298,15 @@ class _FormFillScreenState extends State<FormFillScreen> {
                 final date = await showDatePicker(
                   context: context,
                   initialDate: field.value != null
-                      ? DateTime.parse(field.value)
+                      ? DateTime.tryParse(field.value) ?? DateTime.now()
                       : DateTime.now(),
                   firstDate: DateTime(1950),
                   lastDate: DateTime.now(),
                 );
                 if (date != null) {
-                  formsProvider.updateFieldValue(
-                    field.id,
-                    date.toIso8601String(),
-                  );
-                  _controllers[field.id]?.text = DateFormat('yyyy-MM-dd').format(date);
+                  final dateStr = DateFormat('yyyy-MM-dd').format(date);
+                  formsProvider.updateFieldValue(field.id, dateStr);
+                  _controllers[field.id]?.text = dateStr;
                 }
               },
               child: InputDecorator(
