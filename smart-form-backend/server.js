@@ -4,16 +4,13 @@ const connectDB = require('./src/config/database');
 
 const PORT = process.env.PORT || 5000;
 
-// Connect to database
 connectDB();
 
-// Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log('🚀 Smart Form Backend Server Started');
   console.log('========================================');
   console.log('📍 Port:', PORT);
   console.log('🌍 Environment:', process.env.NODE_ENV);
-  console.log('🔗 Health Check: http://localhost:' + PORT + '/health');
   console.log('========================================');
 });
