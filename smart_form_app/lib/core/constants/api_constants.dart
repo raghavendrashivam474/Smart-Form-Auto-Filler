@@ -1,6 +1,6 @@
 ﻿class ApiConstants {
   // ✅ PRODUCTION URL - Works anywhere!
-  static const String baseUrl = 'https://smart-form-auto-filler-production-25df.up.railway.app/api';
+  static const String baseUrl = 'http://smart-form-filler-production.up.railway.app/api';
   
   // Timeout duration
   static const Duration timeout = Duration(seconds: 30);
