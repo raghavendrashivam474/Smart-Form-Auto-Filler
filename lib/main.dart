@@ -7,6 +7,7 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/profile/providers/profile_provider.dart';
 import 'features/forms/providers/forms_provider.dart';
 import 'features/submissions/providers/submissions_provider.dart';
+import 'features/mapping/providers/mapping_provider.dart'; // ✅ ADD THIS
 import 'features/home/home_screen.dart';
 
 void main() async {
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => FormsProvider()),
         ChangeNotifierProvider(create: (_) => SubmissionsProvider()),
+        ChangeNotifierProvider(create: (_) => MappingProvider()), // ✅ ADD THIS
       ],
       child: MaterialApp(
         title: 'Smart Form Filler',

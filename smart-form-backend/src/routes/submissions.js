@@ -1,22 +1,15 @@
 ﻿const express = require('express');
 const router = express.Router();
-const {
-  submitForm,
-  getSubmissions,
-  getSubmission,
-  deleteSubmission,
-  generatePDF,
-  downloadPDF,
-  getFieldStatistics,
-} = require('../controllers/submissionController');
-const { protect } = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const submissionController = require('../controllers/submissionController');
 
-router.post('/', protect, submitForm);
-router.get('/', protect, getSubmissions);
-router.get('/analytics/fields', protect, getFieldStatistics);
-router.get('/:id', protect, getSubmission);
-router.post('/:id/pdf', protect, generatePDF);
-router.get('/:id/pdf/download', protect, downloadPDF);
-router.delete('/:id', protect, deleteSubmission);
+router.use(auth);
+
+router.post('/', submissionController.submitForm);
+router.get('/', submissionController.getSubmissions);
+router.get('/:id', submissionController.getSubmission);
+router.post('/:id/pdf', submissionController.generatePDF);
+router.get('/:id/pdf/download', submissionController.downloadPDF);
+router.delete('/:id', submissionController.deleteSubmission);
 
 module.exports = router;

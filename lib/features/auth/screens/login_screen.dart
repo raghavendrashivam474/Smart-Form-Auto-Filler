@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/custom_button.dart';
@@ -14,18 +14,67 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _otpController = TextEditingController();
+  bool _otpRequested = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
+    _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendOTP() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _otpRequested = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address'),
+          backgroundColor: AppConstants.errorColor,
+        ),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final responseData = await authProvider.sendOTP(email);
+
+    if (responseData != null && mounted) {
+      setState(() {
+        _otpRequested = true;
+      });
+
+      final devOtp = responseData['otp']?.toString();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            devOtp != null && devOtp.isNotEmpty
+                ? 'Dev OTP for $email: $devOtp'
+                : 'OTP sent to $email',
+          ),
+          backgroundColor: AppConstants.successColor,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error ?? 'Failed to send OTP'),
+          backgroundColor: AppConstants.errorColor,
+        ),
+      );
+    }
   }
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.login(_phoneController.text.trim());
+      final success = await authProvider.login(_emailController.text.trim(), _otpController.text.trim());
 
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
@@ -84,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Subtitle
                   Text(
-                    'Fill forms faster with smart auto-fill',
+                    'Use email OTP to access smart auto-fill',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.grey[600],
                         ),
@@ -92,41 +141,71 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppConstants.spacingXL * 2),
 
-                  // Phone Input
+                  // Email Input
                   TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      labelText: 'Phone Number',
-                      hintText: '+919876543210',
-                      prefixIcon: Icon(Icons.phone),
+                      labelText: 'Email Address',
+                      hintText: 'you@example.com',
+                      prefixIcon: Icon(Icons.email_outlined),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your phone number';
+                        return 'Please enter your email address';
                       }
-                      if (!value.startsWith('+')) {
-                        return 'Phone number must start with +';
+                      if (!value.contains('@')) {
+                        return 'Please enter a valid email address';
                       }
-                      if (value.length < 10) {
-                        return 'Please enter a valid phone number';
+                      if (!value.contains('.')) {
+                        return 'Please enter a valid email address';
                       }
                       return null;
                     },
                   ),
                   const SizedBox(height: AppConstants.spacingL),
 
+                  if (_otpRequested) ...[
+                    TextFormField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'OTP',
+                        hintText: '123456',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter the OTP';
+                        }
+                        if (value.trim().length < 6) {
+                          return 'Please enter a valid 6-digit OTP';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: AppConstants.spacingL),
+                  ],
+
                   // Login Button
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, _) {
                       return CustomButton(
-                        text: 'Login',
-                        onPressed: _login,
+                        text: _otpRequested ? 'Verify & Login' : 'Send OTP',
+                        onPressed: _otpRequested ? _login : _sendOTP,
                         isLoading: authProvider.isLoading,
-                        icon: Icons.login,
+                        icon: _otpRequested ? Icons.verified_user : Icons.send,
                       );
                     },
                   ),
+
+                  if (_otpRequested) ...[
+                    const SizedBox(height: AppConstants.spacingM),
+                    TextButton(
+                      onPressed: _sendOTP,
+                      child: const Text('Resend OTP'),
+                    ),
+                  ],
 
                   const SizedBox(height: AppConstants.spacingL),
 
@@ -147,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(width: AppConstants.spacingS),
                         Expanded(
                           child: Text(
-                            'For demo: Enter any phone number with country code',
+                            'We will send a one-time password to your email via SMTP.',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[700],

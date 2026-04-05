@@ -11,10 +11,13 @@
     this.stats,
   });
 
+  // ✅ ADD THIS GETTER
+  String get name => title;
+
   factory FormModel.fromJson(Map<String, dynamic> json) {
     return FormModel(
-      formId: json['formId'] ?? '',
-      title: json['title'] ?? '',
+      formId: json['formId'] ?? json['_id'] ?? '', // ✅ Handle both
+      title: json['title'] ?? json['name'] ?? '', // ✅ Handle both
       fields: (json['fields'] as List<dynamic>?)
               ?.map((field) => FormField.fromJson(field))
               .toList() ??
@@ -52,7 +55,7 @@ class FormField {
 
   factory FormField.fromJson(Map<String, dynamic> json) {
     return FormField(
-      id: json['id'] ?? '',
+      id: json['id'] ?? json['key'] ?? '', // ✅ Handle both
       label: json['label'] ?? '',
       type: json['type'] ?? 'text',
       required: json['required'] ?? false,

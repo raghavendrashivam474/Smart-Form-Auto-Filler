@@ -8,6 +8,8 @@ const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const formRoutes = require('./routes/forms');
 const submissionRoutes = require('./routes/submissions');
+const mappingRoutes = require('./routes/mapping');
+const documentRoutes = require('./routes/documents'); // ✅ NEW
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -52,6 +54,8 @@ app.get('/api', (req, res) => {
     version: '1.0.0',
     endpoints: {
       auth: {
+        requestOtp: 'POST /api/auth/request-otp',
+        verifyOtp: 'POST /api/auth/verify-otp',
         login: 'POST /api/auth/login',
         me: 'GET /api/auth/me'
       },
@@ -70,6 +74,15 @@ app.get('/api', (req, res) => {
         generatePDF: 'POST /api/submissions/:id/pdf',
         downloadPDF: 'GET /api/submissions/:id/pdf/download',
         analytics: 'GET /api/submissions/analytics/fields'
+      },
+      mapping: {
+        detect: 'POST /api/mapping/detect',
+        save: 'POST /api/mapping/save',
+        getUserMappings: 'GET /api/mapping/user'
+      },
+      documents: { // ✅ NEW
+        upload: 'POST /api/documents/upload',
+        createForm: 'POST /api/documents/create-form'
       }
     },
     documentation: 'See README for full API documentation',
@@ -82,6 +95,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/mapping', mappingRoutes);
+app.use('/api/documents', documentRoutes); // ✅ NEW
 
 // Health check
 app.get('/health', (req, res) => {

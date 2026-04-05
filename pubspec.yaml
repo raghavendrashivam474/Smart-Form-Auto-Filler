@@ -16,6 +16,7 @@ dependencies:
   # HTTP & API
   http: ^1.1.0
   dio: ^5.4.0
+  http_parser: ^4.0.2
 
   # Local Storage
   hive: ^2.2.3
@@ -29,14 +30,18 @@ dependencies:
   path_provider: ^2.1.1
   syncfusion_flutter_pdfviewer: ^24.1.41
 
+  # File & Image Handling
+  file_picker: ^6.1.1
+  image_picker: ^1.0.4
+
   # UI
   google_fonts: ^6.1.0
-  cupertino_icons: ^1.0.2
+  cupertino_icons: ^1.0.6
 
   # Utils
   intl: ^0.19.0
-  logger: ^2.0.2+1
-  url_launcher: ^6.3.2
+  logger: ^2.0.2
+  url_launcher: ^6.2.2
 
 dev_dependencies:
   flutter_test:
@@ -48,7 +53,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/forms/
-    - assets/images/
-    - assets/icons/
+  # Uncomment if you have assets
+  # assets:
+  #   - assets/images/
+  #   - assets/icons/

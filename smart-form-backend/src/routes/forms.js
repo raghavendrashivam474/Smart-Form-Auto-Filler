@@ -1,9 +1,12 @@
 ﻿const express = require('express');
 const router = express.Router();
-const { getAllForms, getForm } = require('../controllers/formController');
-const { protect } = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const formController = require('../controllers/formController');
 
-router.get('/', protect, getAllForms);
-router.get('/:formId', protect, getForm);
+router.use(auth);
+
+router.get('/', formController.getForms);
+router.get('/:formId', formController.getFormById);
+router.post('/', formController.createForm);
 
 module.exports = router;

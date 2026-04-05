@@ -1,19 +1,33 @@
 ﻿class ApiConstants {
-  // Base URL - localhost for web/desktop, 10.0.2.2 for Android emulator
+  // Base URL
   static const String baseUrl = 'http://localhost:5000/api';
   
-  // Endpoints
-  static const String login = '/auth/login';
-  static const String me = '/auth/me';
-  static const String profile = '/profile';
-  static const String forms = '/forms';
-  static const String submissions = '/submissions';
-  
-  // Timeout
+  // Timeout duration
   static const Duration timeout = Duration(seconds: 30);
   
-  // Get PDF download URL
-  static String getPdfDownloadUrl(String submissionId) {
-    return 'http://localhost:5000/uploads/pdfs/submission-$submissionId.pdf';
-  }
+  // Auth endpoints
+  static const String sendOTP = '/auth/send-otp';
+  static const String verifyOTP = '/auth/verify-otp';
+  static const String me = '/auth/me';
+  static const String sendOtp = '/auth/send-otp'; // Alias
+  static const String verifyOtp = '/auth/verify-otp'; // Alias
+  static const String getMe = '/auth/me'; // Alias
+  
+  // Profile endpoints
+  static const String profile = '/profile';
+  
+  // Forms endpoints
+  static const String forms = '/forms';
+  
+  // Submissions endpoints
+  static const String submissions = '/submissions';
+  
+  // Mapping endpoints
+  static const String mappingDetect = '/mapping/detect';
+  static const String mappingSave = '/mapping/save';
+  static const String mappingUser = '/mapping/user';
+  
+  // Document endpoints
+  static const String documentUpload = '/documents/upload';
+  static const String documentCreateForm = '/documents/create-form';
 }

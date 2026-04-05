@@ -65,11 +65,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
+      final profileProvider = context.read<ProfileProvider>();
+      
+      // ✅ Get CURRENT profile data (preserves all existing fields)
+      final currentProfile = profileProvider.profile?.toJson() ?? {};
+      
+      // ✅ Merge with edits (only update what user changed)
       final profileData = {
+        ...currentProfile, // ✅ Keep all existing fields
         'fullName': _fullNameController.text.trim(),
         'email': _emailController.text.trim(),
-        if (_selectedDate != null) 'dateOfBirth': _selectedDate!.toIso8601String(),
+        if (_selectedDate != null) 
+          'dateOfBirth': _selectedDate!.toIso8601String(),
         'address': {
+          // ✅ Preserve existing address fields if any
+          ...(currentProfile['address'] is Map ? Map<String, dynamic>.from(currentProfile['address']) : {}),
           'street': _streetController.text.trim(),
           'city': _cityController.text.trim(),
           'state': _stateController.text.trim(),
@@ -77,12 +87,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         },
       };
 
-      final success = await context.read<ProfileProvider>().updateProfile(profileData);
+      final success = await profileProvider.updateProfile(profileData);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Profile updated successfully'),
+            content: Text('✅ Profile updated successfully'),
             backgroundColor: AppConstants.successColor,
           ),
         );
@@ -90,7 +100,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.read<ProfileProvider>().error ?? 'Failed to update'),
+            content: Text(profileProvider.error ?? '❌ Failed to update'),
             backgroundColor: AppConstants.errorColor,
           ),
         );
@@ -109,6 +119,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppConstants.spacingM),
           children: [
+            // ✅ Info banner
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppConstants.primaryColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your other profile fields will be preserved',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppConstants.primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             TextFormField(
               controller: _fullNameController,
               decoration: const InputDecoration(

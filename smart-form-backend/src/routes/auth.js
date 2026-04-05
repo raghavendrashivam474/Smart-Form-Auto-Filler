@@ -1,9 +1,13 @@
 ﻿const express = require('express');
 const router = express.Router();
-const { login, getMe } = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const authController = require('../controllers/authController');
 
-router.post('/login', login);
-router.get('/me', protect, getMe);
+// Public routes
+router.post('/send-otp', authController.sendOTP);
+router.post('/verify-otp', authController.verifyOTP);
+
+// Protected routes
+router.get('/me', auth, authController.getMe);
 
 module.exports = router;

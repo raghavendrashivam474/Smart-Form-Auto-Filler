@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
@@ -37,14 +37,102 @@ class ApiService {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  // Login
-  Future<Map<String, dynamic>> login(String phoneNumber) async {
+  // ✅ GENERIC POST METHOD (for mapping service)
+  Future<Map<String, dynamic>?> post(String endpoint, Map<String, dynamic> data) async {
     try {
       final response = await http
           .post(
-            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.login}'),
+            Uri.parse('${ApiConstants.baseUrl}$endpoint'),
             headers: _headers,
-            body: jsonEncode({'phoneNumber': phoneNumber}),
+            body: jsonEncode(data),
+          )
+          .timeout(ApiConstants.timeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('API POST Error: $e');
+      return null;
+    }
+  }
+
+  // ✅ GENERIC GET METHOD (for mapping service)
+  Future<Map<String, dynamic>?> get(String endpoint) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+            headers: _headers,
+          )
+          .timeout(ApiConstants.timeout);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('API GET Error: $e');
+      return null;
+    }
+  }
+
+  // ✅ GENERIC PUT METHOD (for mapping service)
+  Future<Map<String, dynamic>?> put(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('${ApiConstants.baseUrl}$endpoint'),
+            headers: _headers,
+            body: jsonEncode(data),
+          )
+          .timeout(ApiConstants.timeout);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      print('API PUT Error: $e');
+      return null;
+    }
+  }
+
+  // Request OTP
+  Future<Map<String, dynamic>> sendOTP(String email) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sendOTP}'),
+            headers: _headers,
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(ApiConstants.timeout);
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success']) {
+        return data['data'];
+      }
+
+      throw Exception(data['message'] ?? 'OTP request failed');
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  // Verify OTP and Login
+  Future<Map<String, dynamic>> login(String email, String otp) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.verifyOTP}'),
+            headers: _headers,
+            body: jsonEncode({
+              'email': email,
+              'otp': otp,
+            }),
           )
           .timeout(ApiConstants.timeout);
 

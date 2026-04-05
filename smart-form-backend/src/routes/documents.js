@@ -1,19 +1,18 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
 const {
   uploadDocument,
-  getDocuments,
-  getDocument,
-  deleteDocument,
-  downloadDocument,
+  createFormFromFields
 } = require('../controllers/documentController');
-const { protect } = require('../middleware/auth');
-const upload = require('../config/multer');
 
-router.post('/upload', protect, upload.single('document'), uploadDocument);
-router.get('/', protect, getDocuments);
-router.get('/:id', protect, getDocument);
-router.delete('/:id', protect, deleteDocument);
-router.get('/:id/download', protect, downloadDocument);
+// All routes require authentication
+router.use(auth);
+
+// Upload and process document
+router.post('/upload', uploadDocument);
+
+// Create form from detected fields
+router.post('/create-form', createFormFromFields);
 
 module.exports = router;

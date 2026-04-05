@@ -1,159 +1,155 @@
-﻿const Document = require('../models/Document');
+const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const documentProcessor = require('../services/ocr/documentProcessor');
+const fieldDetector = require('../services/ocr/fieldDetector');
+const Form = require('../models/Form');
 
-// Upload document
-exports.uploadDocument = async (req, res) => {
-  try {
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/temp/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|pdf/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only PDF and image files (JPG, PNG) are allowed!'));
+    }
+  }
+}).single('document');
+
+/**
+ * @desc    Upload and process document
+ * @route   POST /api/documents/upload
+ * @access  Private
+ */
+const uploadDocument = async (req, res) => {
+  upload(req, res, async function (err) {
+    if (err) {
+      console.error('Upload error:', err);
+      return res.status(400).json({
+        success: false,
+        message: err.message
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded',
+        message: 'No file uploaded'
       });
     }
 
-    const { name, category } = req.body;
+    try {
+      const filePath = req.file.path;
+      const fileType = req.file.mimetype;
 
-    if (!name || !category) {
-      // Delete uploaded file if validation fails
-      await fs.unlink(req.file.path);
+      console.log('📤 File uploaded:', req.file.originalname);
+      console.log('📁 Saved to:', filePath);
+
+      // Process document (OCR)
+      const { text } = await documentProcessor.processDocument(filePath, fileType);
+
+      // Analyze and detect fields
+      const analysis = fieldDetector.analyzeDocument(text);
+
+      // Clean up uploaded file
+      await fs.unlink(filePath).catch(() => {});
+
+      res.json({
+        success: true,
+        message: 'Document processed successfully',
+        data: {
+          extractedText: text,
+          analysis: analysis,
+          fileName: req.file.originalname
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Document processing error:', error);
+      
+      // Clean up file on error
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(() => {});
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process document',
+        error: error.message
+      });
+    }
+  });
+};
+
+/**
+ * @desc    Create form from detected fields
+ * @route   POST /api/documents/create-form
+ * @access  Private
+ */
+const createFormFromFields = async (req, res) => {
+  try {
+    const { name, description, fields } = req.body;
+    const userId = req.user.userId;
+
+    if (!name || !fields || !Array.isArray(fields)) {
       return res.status(400).json({
         success: false,
-        message: 'Name and category are required',
+        message: 'Form name and fields are required'
       });
     }
 
-    const document = await Document.create({
-      userId: req.user._id,
+    // Create form
+    const form = await Form.create({
       name,
-      category,
-      filename: req.file.filename,
-      path: req.file.path,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
+      description: description || 'Auto-generated from document',
+      fields: fields.map(f => ({
+        name: f.name,
+        label: f.label,
+        type: f.type,
+        required: f.required !== false,
+        profileKey: f.profileKey,
+        options: f.options
+      })),
+      isActive: true
     });
+
+    console.log('✅ Form created from document:', form.name);
 
     res.status(201).json({
       success: true,
-      message: 'Document uploaded successfully',
-      data: document,
+      message: 'Form created successfully',
+      data: form
     });
+
   } catch (error) {
-    // Clean up file if database save fails
-    if (req.file) {
-      await fs.unlink(req.file.path).catch(console.error);
-    }
+    console.error('❌ Create form error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to create form',
+      error: error.message
     });
   }
 };
 
-// Get all user documents
-exports.getDocuments = async (req, res) => {
-  try {
-    const { category } = req.query;
-    
-    const filter = { userId: req.user._id };
-    if (category) {
-      filter.category = category;
-    }
-
-    const documents = await Document.find(filter).sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: documents,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Get single document
-exports.getDocument = async (req, res) => {
-  try {
-    const document = await Document.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      data: document,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Delete document
-exports.deleteDocument = async (req, res) => {
-  try {
-    const document = await Document.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found',
-      });
-    }
-
-    // Delete file from filesystem
-    await fs.unlink(document.path);
-
-    // Delete from database
-    await document.deleteOne();
-
-    res.json({
-      success: true,
-      message: 'Document deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Download document
-exports.downloadDocument = async (req, res) => {
-  try {
-    const document = await Document.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Document not found',
-      });
-    }
-
-    res.download(document.path, document.filename);
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
+module.exports = {
+  uploadDocument,
+  createFormFromFields
 };

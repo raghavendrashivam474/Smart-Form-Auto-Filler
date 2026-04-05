@@ -3,6 +3,19 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 
 class AppTheme {
+  // ✅ ADD COLOR CONSTANTS (for mapping screen)
+  static const Color primaryColor = AppConstants.primaryColor;
+  static const Color secondaryColor = Color(0xFF8B5CF6);
+  static const Color successColor = AppConstants.successColor;
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = AppConstants.errorColor;
+  
+  static const Color backgroundColor = Color(0xFFF9FAFB);
+  static const Color cardColor = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF111827);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color borderColor = Color(0xFFE5E7EB);
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

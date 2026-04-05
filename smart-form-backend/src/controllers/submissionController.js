@@ -1,233 +1,288 @@
 ﻿const Submission = require('../models/Submission');
 const Form = require('../models/Form');
 const User = require('../models/User');
-const FieldTrackerService = require('../services/fieldTracker');
-const PDFGeneratorService = require('../services/pdfGenerator');
-const path = require('path');
-const fs = require('fs').promises;
+const pdfGenerator = require('../services/pdfGenerator');
 
-// Submit form
-exports.submitForm = async (req, res) => {
+/**
+ * @desc    Submit form
+ * @route   POST /api/submissions
+ * @access  Private
+ */
+const submitForm = async (req, res) => {
   try {
-    const { formId, data, documents } = req.body;
+    const { formId, data } = req.body;
+    const userId = req.user.userId;
 
-    const form = await Form.findOne({ formId });
+    console.log('📝 Form submission:', { formId, userId, data });
+
+    // Validate form exists
+    const form = await Form.findById(formId);
     if (!form) {
       return res.status(404).json({
         success: false,
-        message: 'Form not found',
+        message: 'Form not found'
       });
     }
 
+    // Create submission
     const submission = await Submission.create({
-      userId: req.user._id,
-      formId,
-      formTitle: form.title,
+      user: userId,
+      form: formId,
       data,
-      documents: documents || [],
-      status: 'submitted',
+      submittedAt: new Date()
     });
 
-    // Track field usage (adaptive learning)
-    await FieldTrackerService.trackFields(form.fields);
+    console.log('✅ Submission created:', submission._id);
 
-    // ✨ ENHANCED: Save ALL form data to profile for future auto-fill
-    const profileUpdates = {};
-    
-    Object.keys(data).forEach(key => {
-      const field = form.fields.find(f => f.id === key);
-      
-      if (data[key]) {
-        if (field && field.profileKey) {
-          // Has explicit mapping - use it
-          profileUpdates['profile.' + field.profileKey] = data[key];
-        } else {
-          // No mapping - save with field ID as key
-          profileUpdates['profile.' + key] = data[key];
+    // ============================================
+    // UPDATE USER PROFILE (MERGE-BASED) - FIXED
+    // ============================================
+    const user = await User.findById(userId);
+    if (user) {
+      const updateObject = {};
+
+      // Handle address separately
+      if (data.address && typeof data.address === 'object') {
+        console.log('🏠 Updating address from submission:', data.address);
+        
+        const addressUpdate = {
+          street: data.address.street || user.profile?.address?.street || '',
+          city: data.address.city || user.profile?.address?.city || '',
+          state: data.address.state || user.profile?.address?.state || '',
+          pincode: data.address.pincode || user.profile?.address?.pincode || ''
+        };
+
+        updateObject['profile.address'] = addressUpdate;
+      }
+
+      // Process all other fields
+      for (const [key, value] of Object.entries(data)) {
+        if (key === 'address') continue; // Already handled
+        
+        if (value !== undefined && value !== null && value !== '') {
+          updateObject[`profile.${key}`] = value;
         }
       }
-    });
 
-    if (Object.keys(profileUpdates).length > 0) {
-      await User.findByIdAndUpdate(req.user._id, {
-        $set: profileUpdates
-      });
-      console.log('✅ Profile updated with', Object.keys(profileUpdates).length, 'fields');
-      console.log('📝 Updated fields:', Object.keys(profileUpdates));
+      console.log('🔄 Updating profile with:', JSON.stringify(updateObject, null, 2));
+
+      await User.findByIdAndUpdate(
+        userId,
+        { $set: updateObject },
+        { runValidators: true }
+      );
+
+      console.log('✅ Profile updated from submission');
     }
+
+    // Populate form details
+    await submission.populate('form', 'name description');
 
     res.status(201).json({
       success: true,
       message: 'Form submitted successfully',
-      data: submission,
+      data: submission
     });
+
   } catch (error) {
-    console.error('❌ Submission error:', error);
+    console.error('❌ Submit form error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error submitting form',
+      error: error.message
     });
   }
 };
 
-// Get all user submissions
-exports.getSubmissions = async (req, res) => {
+/**
+ * @desc    Get all submissions for logged-in user
+ * @route   GET /api/submissions
+ * @access  Private
+ */
+const getSubmissions = async (req, res) => {
   try {
-    const submissions = await Submission.find({ userId: req.user._id })
-      .sort({ createdAt: -1 });
+    const userId = req.user.userId;
+
+    const submissions = await Submission.find({ user: userId })
+      .populate('form', 'name description')
+      .sort({ submittedAt: -1 })
+      .select('-__v');
 
     res.json({
       success: true,
       count: submissions.length,
-      data: submissions,
+      data: submissions
     });
+
   } catch (error) {
+    console.error('Get submissions error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching submissions'
     });
   }
 };
 
-// Get single submission
-exports.getSubmission = async (req, res) => {
+/**
+ * @desc    Get single submission
+ * @route   GET /api/submissions/:id
+ * @access  Private
+ */
+const getSubmission = async (req, res) => {
   try {
     const submission = await Submission.findOne({
       _id: req.params.id,
-      userId: req.user._id,
-    });
+      user: req.user.userId
+    }).populate('form', 'name description fields');
 
     if (!submission) {
       return res.status(404).json({
         success: false,
-        message: 'Submission not found',
+        message: 'Submission not found'
       });
     }
 
     res.json({
       success: true,
-      data: submission,
+      data: submission
     });
+
   } catch (error) {
+    console.error('Get submission error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error fetching submission'
     });
   }
 };
 
-// Delete submission
-exports.deleteSubmission = async (req, res) => {
+/**
+ * @desc    Generate PDF for submission
+ * @route   POST /api/submissions/:id/pdf
+ * @access  Private
+ */
+const generatePDF = async (req, res) => {
   try {
     const submission = await Submission.findOne({
       _id: req.params.id,
-      userId: req.user._id,
-    });
+      user: req.user.userId
+    }).populate('form', 'name description fields');
 
     if (!submission) {
       return res.status(404).json({
         success: false,
-        message: 'Submission not found',
+        message: 'Submission not found'
       });
     }
 
-    if (submission.pdfUrl) {
-      await fs.unlink(path.join(__dirname, '../..', submission.pdfUrl)).catch(console.error);
-    }
+    // Generate PDF
+    const pdfBuffer = await pdfGenerator.generateSubmissionPDF(submission);
 
-    await submission.deleteOne();
-
-    res.json({
-      success: true,
-      message: 'Submission deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Generate PDF
-exports.generatePDF = async (req, res) => {
-  try {
-    const submission = await Submission.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!submission) {
-      return res.status(404).json({
-        success: false,
-        message: 'Submission not found',
-      });
-    }
-
-    const pdfDir = path.join(__dirname, '../../uploads/pdfs');
-    await fs.mkdir(pdfDir, { recursive: true });
-
-    const filename = `submission-${submission._id}.pdf`;
-    const filepath = path.join(pdfDir, filename);
-
-    await PDFGeneratorService.generateFormPDF(submission, filepath);
-
-    submission.pdfUrl = `/uploads/pdfs/${filename}`;
+    // Save PDF reference
+    submission.pdfGenerated = true;
+    submission.pdfData = pdfBuffer;
     await submission.save();
 
     res.json({
       success: true,
       message: 'PDF generated successfully',
       data: {
-        pdfUrl: submission.pdfUrl
+        submissionId: submission._id,
+        pdfGenerated: true
       }
     });
+
   } catch (error) {
+    console.error('Generate PDF error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error generating PDF'
     });
   }
 };
 
-// Download PDF
-exports.downloadPDF = async (req, res) => {
+/**
+ * @desc    Download PDF for submission
+ * @route   GET /api/submissions/:id/pdf/download
+ * @access  Private
+ */
+const downloadPDF = async (req, res) => {
   try {
     const submission = await Submission.findOne({
       _id: req.params.id,
-      userId: req.user._id,
-    });
+      user: req.user.userId
+    }).populate('form', 'name');
 
-    if (!submission || !submission.pdfUrl) {
+    if (!submission) {
       return res.status(404).json({
         success: false,
-        message: 'PDF not found',
+        message: 'Submission not found'
       });
     }
 
-    const filepath = path.join(__dirname, '../..', submission.pdfUrl);
-    res.download(filepath);
+    if (!submission.pdfGenerated || !submission.pdfData) {
+      return res.status(404).json({
+        success: false,
+        message: 'PDF not generated yet'
+      });
+    }
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="submission-${submission._id}.pdf"`,
+      'Content-Length': submission.pdfData.length
+    });
+
+    res.send(submission.pdfData);
+
   } catch (error) {
+    console.error('Download PDF error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error downloading PDF'
     });
   }
 };
 
-// Get field statistics
-exports.getFieldStatistics = async (req, res) => {
+/**
+ * @desc    Delete submission
+ * @route   DELETE /api/submissions/:id
+ * @access  Private
+ */
+const deleteSubmission = async (req, res) => {
   try {
-    const stats = await FieldTrackerService.getStatistics();
-    
+    const submission = await Submission.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user.userId
+    });
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Submission not found'
+      });
+    }
+
     res.json({
       success: true,
-      data: stats,
+      message: 'Submission deleted successfully'
     });
+
   } catch (error) {
+    console.error('Delete submission error:', error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Error deleting submission'
     });
   }
+};
+
+// Export all functions
+module.exports = {
+  submitForm,
+  getSubmissions,
+  getSubmission,
+  generatePDF,
+  downloadPDF,
+  deleteSubmission
 };

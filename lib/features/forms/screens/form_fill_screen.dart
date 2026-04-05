@@ -6,6 +6,9 @@ import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../providers/forms_provider.dart';
 import '../../submissions/providers/submissions_provider.dart';
+import '../../profile/providers/profile_provider.dart';
+import '../../mapping/providers/mapping_provider.dart';
+import '../../mapping/screens/mapping_confirmation_screen.dart';
 
 class FormFillScreen extends StatefulWidget {
   final String formId;
@@ -20,26 +23,217 @@ class _FormFillScreenState extends State<FormFillScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
   bool _isSubmitting = false;
+  bool _isMappingDetected = false;
+  Map<String, String>? _fieldMapping;
 
   @override
   void initState() {
     super.initState();
-    _loadForm();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadFormWithMapping();
+    });
   }
 
-  Future<void> _loadForm() async {
-    await context.read<FormsProvider>().loadForm(widget.formId);
-    final form = context.read<FormsProvider>().currentForm;
+  // ✅ HELPER - Convert any map to Map<String, dynamic> safely
+  Map<String, dynamic> _safeMap(dynamic data) {
+    if (data == null) return {};
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return {};
+  }
+
+  // ✅ HELPER - Get profile as safe Map
+  Map<String, dynamic> _getProfileMap(dynamic profile) {
+    if (profile == null) return {};
     
-    if (form != null) {
-      for (var field in form.fields) {
-        if (!_controllers.containsKey(field.id)) {
-          _controllers[field.id] = TextEditingController(
-            text: field.value?.toString() ?? '',
+    try {
+      // Try toJson() if available
+      if (profile is Map) {
+        return Map<String, dynamic>.from(profile);
+      }
+      
+      // Check if profile has toJson method
+      final json = profile.toJson();
+      if (json is Map) {
+        return Map<String, dynamic>.from(json);
+      }
+      return {};
+    } catch (e) {
+      print('⚠️ Error converting profile to Map: $e');
+      return {};
+    }
+  }
+
+  Future<void> _loadFormWithMapping() async {
+    final formsProvider = context.read<FormsProvider>();
+    final profileProvider = context.read<ProfileProvider>();
+    final mappingProvider = context.read<MappingProvider>();
+
+    // 1. Load form
+    await formsProvider.loadForm(widget.formId);
+    final form = formsProvider.currentForm;
+
+    if (form == null) {
+      if (mounted) setState(() {});
+      return;
+    }
+
+    // 2. Load profile
+    await profileProvider.loadProfile();
+    final profile = profileProvider.profile;
+
+    // 3. Prepare fields for mapping detection
+    final fields = form.fields.map((field) => {
+      'key': field.id,
+      'label': field.label,
+      'type': field.type,
+    }).toList();
+
+    // 4. Detect mapping
+    print('🔍 Detecting mapping for ${fields.length} fields...');
+    final mappingResult = await mappingProvider.detectMapping(fields);
+
+    if (mappingResult != null) {
+      // ✅ FIXED - Use _safeMap to handle _JsonMap
+      final result = _safeMap(mappingResult);
+      final needsConfirmation = (result['needsConfirmation'] as List?) ?? [];
+      final detectedMapping = _safeMap(result['mapping']);
+      final formHash = result['formHash']?.toString() ?? '';
+      final isCached = result['cached'] == true;
+
+      print('📊 Mapping detection result:');
+      print('   Cached: $isCached');
+      print('   Auto-mapped: ${detectedMapping.length}');
+      print('   Needs confirmation: ${needsConfirmation.length}');
+
+      // 5. Show mapping confirmation if needed
+      if (needsConfirmation.isNotEmpty && !isCached && mounted) {
+        // ✅ FIXED - Use _getProfileMap for safe conversion
+        final profileMap = _getProfileMap(profile);
+        
+        final confirmedMapping = await Navigator.push<Map<String, String>>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MappingConfirmationScreen(
+              formName: form.name,
+              fields: fields,
+              detectedMapping: detectedMapping,
+              needsConfirmation: needsConfirmation,
+              profile: profileMap,
+            ),
+          ),
+        );
+
+        if (confirmedMapping == null) {
+          if (mounted) Navigator.pop(context);
+          return;
+        }
+
+        await mappingProvider.saveMapping(
+          formHash,
+          form.name,
+          confirmedMapping,
+        );
+
+        _fieldMapping = confirmedMapping;
+      } else {
+        _fieldMapping = _convertDetectedMapping(detectedMapping);
+
+        if (!isCached && formHash.isNotEmpty) {
+          await mappingProvider.saveMapping(
+            formHash,
+            form.name,
+            _fieldMapping!,
           );
         }
       }
-      if (mounted) setState(() {});
+
+      _isMappingDetected = true;
+
+      // ✅ FIXED - Use _getProfileMap for safe conversion
+      if (_fieldMapping != null && profile != null) {
+        final profileMap = _getProfileMap(profile);
+        _applyAutoFillWithMapping(profileMap);
+      }
+    }
+
+    // Initialize controllers
+    for (var field in form.fields) {
+      if (!_controllers.containsKey(field.id)) {
+        _controllers[field.id] = TextEditingController(
+          text: field.value?.toString() ?? '',
+        );
+      }
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  Map<String, String> _convertDetectedMapping(Map<String, dynamic> detectedMapping) {
+    Map<String, String> result = {};
+    
+    detectedMapping.forEach((fieldKey, value) {
+      if (value is Map) {
+        final safeValue = _safeMap(value);
+        if (safeValue.containsKey('profileKey')) {
+          result[fieldKey] = safeValue['profileKey']?.toString() ?? '';
+        }
+      } else if (value is String) {
+        result[fieldKey] = value;
+      }
+    });
+    
+    return result;
+  }
+
+  void _applyAutoFillWithMapping(Map<String, dynamic> profile) {
+    if (_fieldMapping == null) return;
+
+    final formsProvider = context.read<FormsProvider>();
+
+    _fieldMapping!.forEach((fieldKey, profileKey) {
+      if (profile.containsKey(profileKey)) {
+        final value = profile[profileKey];
+        final stringValue = value?.toString() ?? '';
+        
+        formsProvider.updateFieldValue(fieldKey, stringValue);
+        
+        if (_controllers.containsKey(fieldKey)) {
+          _controllers[fieldKey]?.text = stringValue;
+        }
+        
+        print('✅ Auto-filled: $fieldKey ← $stringValue (from $profileKey)');
+      }
+    });
+  }
+
+  // ✅ FIXED - Save form edits back to profile with proper type handling
+  Future<void> _updateProfileFromForm(Map<String, dynamic> formData) async {
+    if (_fieldMapping == null) return;
+
+    final profileProvider = context.read<ProfileProvider>();
+    Map<String, dynamic> profileUpdates = {};
+
+    // ✅ FIXED - Convert to safe Map
+    final safeFormData = _safeMap(formData);
+
+    _fieldMapping!.forEach((fieldKey, profileKey) {
+      if (safeFormData.containsKey(fieldKey)) {
+        final value = safeFormData[fieldKey];
+        if (value != null && value.toString().isNotEmpty) {
+          // ✅ Ensure value is a String
+          profileUpdates[profileKey] = value.toString();
+        }
+      }
+    });
+
+    if (profileUpdates.isNotEmpty) {
+      try {
+        await profileProvider.updateProfile(profileUpdates);
+        print('✅ Profile updated with form edits: ${profileUpdates.keys.join(", ")}');
+      } catch (e) {
+        print('⚠️ Failed to update profile: $e');
+      }
     }
   }
 
@@ -59,8 +253,12 @@ class _FormFillScreenState extends State<FormFillScreen> {
         final formsProvider = context.read<FormsProvider>();
         final submissionsProvider = context.read<SubmissionsProvider>();
 
-        // Get form data
-        final formData = formsProvider.getFormData();
+        // ✅ FIXED - Get form data and convert safely
+        final rawFormData = formsProvider.getFormData();
+        final formData = _safeMap(rawFormData);
+
+        // ✅ SAVE USER EDITS BACK TO PROFILE (Memory Override)
+        await _updateProfileFromForm(formData);
 
         // Submit form
         final submission = await submissionsProvider.submitForm(
@@ -78,13 +276,13 @@ class _FormFillScreenState extends State<FormFillScreen> {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Row(
+              content: const Row(
                 children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  const Expanded(
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      '✅ PDF Generated Successfully!',
+                      '✅ Form submitted & profile updated!',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -131,6 +329,42 @@ class _FormFillScreenState extends State<FormFillScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fill Form'),
+        actions: [
+          if (_isMappingDetected)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppConstants.successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.smart_toy,
+                        size: 16,
+                        color: AppConstants.successColor,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Smart Fill',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppConstants.successColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: Consumer<FormsProvider>(
         builder: (context, formsProvider, _) {
@@ -188,6 +422,15 @@ class _FormFillScreenState extends State<FormFillScreen> {
                           ],
                         ),
                       ),
+                      if (_isMappingDetected)
+                        const Tooltip(
+                          message: 'Intelligent field mapping active',
+                          child: Icon(
+                            Icons.psychology,
+                            color: AppConstants.primaryColor,
+                            size: 24,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -298,7 +541,7 @@ class _FormFillScreenState extends State<FormFillScreen> {
                 final date = await showDatePicker(
                   context: context,
                   initialDate: field.value != null
-                      ? DateTime.tryParse(field.value) ?? DateTime.now()
+                      ? DateTime.tryParse(field.value.toString()) ?? DateTime.now()
                       : DateTime.now(),
                   firstDate: DateTime(1950),
                   lastDate: DateTime.now(),

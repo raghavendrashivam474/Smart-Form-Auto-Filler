@@ -1,0 +1,10 @@
+﻿Application Form
+
+Full Name: _______________
+Email Address: _______________
+Phone Number: _______________
+Date of Birth: _______________
+Address: _______________
+City: _______________
+State: _______________
+PIN Code: _______________

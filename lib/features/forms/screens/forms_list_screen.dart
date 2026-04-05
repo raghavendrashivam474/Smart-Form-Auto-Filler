@@ -16,11 +16,16 @@ class _FormsListScreenState extends State<FormsListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadForms();
+    // ✅ FIXED - Schedule after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadForms();
+    });
   }
 
   Future<void> _loadForms() async {
-    await context.read<FormsProvider>().loadForms();
+    if (mounted) {
+      await context.read<FormsProvider>().loadForms();
+    }
   }
 
   @override
@@ -32,7 +37,7 @@ class _FormsListScreenState extends State<FormsListScreen> {
         }
 
         if (formsProvider.forms.isEmpty) {
-          return EmptyState(
+          return const EmptyState(
             icon: Icons.description_outlined,
             title: 'No Forms Available',
             subtitle: 'Check back later for new forms',
@@ -151,6 +156,45 @@ class _FormsListScreenState extends State<FormsListScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ✅ ADD EmptyState widget if it doesn't exist
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ],
+      ),
     );
   }
 }

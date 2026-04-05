@@ -1,27 +1,13 @@
 # smart_form_filler
-=======
-# 🚀 Smart Form Auto-Filler
->>>>>>> 3cc5b1de6d17109efc346c840087559582578a97
 
 > Fill once. Use everywhere.
 
-Smart Form Auto-Filler is a full-stack mobile application designed to eliminate repetitive form filling by allowing users to store personal data and documents once, and reuse them across multiple forms such as scholarships, admissions, and job applications.
-
----
+Smart Form Auto-Filler is a full-stack mobile application that reduces repetitive form entry by storing user profile data and documents once, then reusing them across multiple forms such as scholarships, admissions, and job applications.
 
 ## 📌 Features
 
 ### 🧠 Smart Auto-Fill
 
-<<<<<<< HEAD
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-=======
-# Smart-Form-Auto-Filler
-Fill once. Use everywhere.  Smart Form Auto-Filler helps users eliminate repetitive form filling by intelligently reusing personal data and documents. Built with a dynamic form engine, auto-fill logic, and adaptive learning system.
->>>>>>> 6686af5e47e28224d964a022b7c144d93ba31014
-=======
 * Automatically fills form fields using stored user profile data
 * Reduces manual input effort significantly
 
@@ -88,10 +74,18 @@ File Storage (Local/Cloud)
 
 ---
 
+## 🔐 Authentication Flow
+
+```plaintext
+Enter Email → Request OTP → Receive OTP via SMTP → Verify OTP → JWT Login → Home Screen
+```
+
+The app now uses email-based OTP authentication instead of phone-number login. In development, OTP delivery can be skipped with `SKIP_OTP_VERIFICATION=true`, which returns the OTP directly for testing.
+
 ## 🔄 Application Flow
 
 ```plaintext
-User Login →
+Login with Email OTP →
 Profile Setup →
 Select Form →
 Auto-Fill Fields →
@@ -108,6 +102,8 @@ Adaptive Learning Updates Profile
 
 ### Authentication
 
+* `POST /api/auth/request-otp`
+* `POST /api/auth/verify-otp`
 * `POST /api/auth/login`
 * `GET /api/auth/me`
 
@@ -172,6 +168,20 @@ npm install
 npm run dev
 ```
 
+Configure SMTP and OTP settings in `smart-form-backend/.env` before running the backend:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@example.com
+SMTP_PASS=your-app-password
+SMTP_FROM="Smart Form Filler <your-email@example.com>"
+OTP_TTL_MINUTES=10
+OTP_MAX_ATTEMPTS=5
+SKIP_OTP_VERIFICATION=false
+```
+
 ### Frontend Setup
 
 ```bash
@@ -204,7 +214,7 @@ flutter run
 
 ## 🚀 Future Enhancements
 
-* Real OTP authentication (Twilio)
+* Production OTP delivery hardening and rate limiting
 * Cloud storage integration
 * Advanced document recognition (AI/OCR)
 * Search & filter forms

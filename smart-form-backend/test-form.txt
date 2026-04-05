@@ -1,0 +1,12 @@
+﻿Job Application Form
+
+Full Name: _________________
+Email Address: _________________
+Phone Number: _________________
+Date of Birth: _________________
+Current Address: _________________
+City: _________________
+State: _________________
+PIN Code: _________________
+Current Company: _________________
+Years of Experience: _________________

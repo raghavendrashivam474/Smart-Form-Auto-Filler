@@ -76,7 +76,7 @@ class _SubmissionsScreenState extends State<SubmissionsScreen> {
         }
 
         if (submissionsProvider.submissions.isEmpty) {
-          return EmptyState(
+          return const EmptyState(
             icon: Icons.inbox_outlined,
             title: 'No Submissions Yet',
             subtitle: 'Fill and submit a form to see it here',

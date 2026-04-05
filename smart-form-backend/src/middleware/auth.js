@@ -1,7 +1,7 @@
 ﻿const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const protect = async (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
     let token;
 
@@ -16,18 +16,32 @@ const protect = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-this');
+    
+    // ✅ Set userId from decoded token
+    req.user = {
+      userId: decoded.userId || decoded.id || decoded._id
+    };
 
-    if (!req.user) {
+    // Optional: Also load full user if needed
+    const user = await User.findById(req.user.userId);
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'User not found',
       });
     }
 
+    // Add full user data to request
+    req.user._id = user._id;
+    req.user.email = user.email;
+    req.user.profile = user.profile;
+
+    console.log('🔐 Auth successful - User ID:', req.user.userId);
+
     next();
   } catch (error) {
+    console.error('Auth error:', error.message);
     res.status(401).json({
       success: false,
       message: 'Not authorized, token failed',
@@ -35,4 +49,5 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+// ✅ Export as default function (not as object)
+module.exports = auth;

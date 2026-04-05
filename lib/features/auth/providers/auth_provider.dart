@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/models/user.dart';
 import '../../../core/services/api_service.dart';
 
@@ -17,6 +17,24 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+
+  Future<Map<String, dynamic>?> sendOTP(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final data = await _apiService.sendOTP(email);
+      _isLoading = false;
+      notifyListeners();
+      return data;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
 
   Future<void> init() async {
     await _apiService.init();
@@ -40,13 +58,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String phoneNumber) async {
+  Future<bool> login(String email, String otp) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final data = await _apiService.login(phoneNumber);
+      final data = await _apiService.login(email, otp);
       _user = User.fromJson(data['user']);
       _status = AuthStatus.authenticated;
       _error = null;
