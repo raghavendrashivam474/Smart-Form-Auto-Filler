@@ -22,11 +22,12 @@ app.use(helmet({
 
 // CORS configuration - Allow all origins for development
 app.use(cors({
-  origin: true,
-  credentials: true,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.options('*', cors());
 
 app.use(morgan('dev'));
 app.use(express.json());
