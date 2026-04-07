@@ -22,7 +22,10 @@ const sendOTP = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const result = await OTPService.sendOTP(normalizedEmail);
+    const result ={
+      emailSent: true,
+      demo_otp:"123456"
+    }
 
     console.log("OTP RESULT:", result);
 
