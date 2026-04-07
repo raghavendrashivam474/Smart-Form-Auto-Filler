@@ -49,37 +49,46 @@ class OTPService {
   }
 
   // Verify OTP
-  static async verifyOTP(email, otp) {
-    try {
-      console.log("🔍 VERIFY:", email, otp);
+static async verifyOTP(email, otp) {
+  try {
+    console.log("🔍 VERIFY:", email, otp);
 
-      const record = await OTPModel.findOne({ email });
+    const record = await OTPModel.findOne({ email });
 
-      if (!record) {
-        return { success: false, message: "OTP not found" };
-      }
+    console.log("📦 DB RECORD:", record);
 
-      // Check expiry
-      if (new Date(record.expiresAt).getTime() < Date.now()) {
-        await OTPModel.deleteMany({ email });
-        return { success: false, message: "OTP expired" };
-      }
-
-      // Check match
-      if (record.otp.toString() !== otp.toString()) {
-        return { success: false, message: "Invalid OTP" };
-      }
-
-      // Delete after success
-      await OTPModel.deleteMany({ email });
-
-      return { success: true };
-
-    } catch (error) {
-      console.error("❌ VERIFY ERROR:", error);
-      return { success: false, message: "Verification failed" };
+    if (!record) {
+      console.log("❌ No OTP found in DB");
+      return { success: false, message: "OTP not found" };
     }
+
+    console.log("🧪 Comparing:", record.otp, otp);
+
+    // Expiry check
+    if (!record.expiresAt || new Date(record.expiresAt).getTime() < Date.now()) {
+      console.log("⏰ OTP expired");
+      await OTPModel.deleteMany({ email });
+      return { success: false, message: "OTP expired" };
+    }
+
+    // Safe comparison
+    if (String(record.otp) !== String(otp)) {
+      console.log("❌ OTP mismatch");
+      return { success: false, message: "Invalid OTP" };
+    }
+
+    // Success
+    await OTPModel.deleteMany({ email });
+
+    console.log("✅ OTP VERIFIED SUCCESS");
+
+    return { success: true };
+
+  } catch (error) {
+    console.error("❌ VERIFY ERROR FULL:", error); // 🔥 IMPORTANT CHANGE
+    return { success: false, message: "Verification failed" };
   }
+}
 }
 
 module.exports = OTPService;

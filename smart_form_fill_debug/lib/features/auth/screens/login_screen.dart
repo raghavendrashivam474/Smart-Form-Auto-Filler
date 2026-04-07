@@ -25,51 +25,49 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _sendOTP() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
-      setState(() {
-        _otpRequested = false;
-      });
+Future<void> _sendOTP() async {
+  final email = _emailController.text.trim();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address'),
-          backgroundColor: AppConstants.errorColor,
+if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
+  ScaffoldMessenger.of(context).showSnackBar(
+   const SnackBar(
+  content: Text('Please enter a valid email address'),
+)
+  );
+  return;
+}
+
+  final authProvider = context.read<AuthProvider>();
+  final responseData = await authProvider.sendOTP(email);
+
+  if (responseData != null && mounted) {
+
+    setState(() {
+      _otpRequested = true;
+    });
+
+    final devOtp = responseData['demo_otp']?.toString();
+
+    if (devOtp != null) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Dev Mode"),
+          content: Text("Your OTP is $devOtp"),
         ),
       );
-      return;
+
+      _otpController.text = devOtp;
     }
 
-    final authProvider = context.read<AuthProvider>();
-    final responseData = await authProvider.sendOTP(email);
-
-    if (responseData != null && mounted) {
-      setState(() {
-        _otpRequested = true;
-      });
-
-      final devOtp = responseData['otp']?.toString();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            devOtp != null && devOtp.isNotEmpty
-                ? 'Dev OTP for $email: $devOtp'
-                : 'OTP sent to $email',
-          ),
-          backgroundColor: AppConstants.successColor,
-        ),
-      );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Failed to send OTP'),
-          backgroundColor: AppConstants.errorColor,
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("OTP sent successfully"),
+        backgroundColor: AppConstants.successColor,
+      ),
+    );
   }
+}
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
