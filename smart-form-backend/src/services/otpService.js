@@ -46,11 +46,13 @@ class OTPService {
     return { success: false, message: "OTP not found" };
   }
 
-  if (record.expiresAt < Date.now()) {
+  if (new Date(record.expiresAt).getTime() < Date.now()) {
+    console.log("⏰ OTP expired for:", email);
+    await OTPModel.deleteMany({ email });
     return { success: false, message: "OTP expired" };
   }
 
-  if (record.otp !== otp) {
+if (record.otp.toString() !== otp.toString()) {
     return { success: false, message: "Invalid OTP" };
   }
 
