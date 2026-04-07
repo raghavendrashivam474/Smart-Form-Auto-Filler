@@ -30,12 +30,25 @@ class OTPService {
     process.env.EMAIL_PASS ? "PASS OK" : 
     "NO PASS");
     
+  try {
+  await EmailService.sendOTPEmail(email, otp);  // 🔥 MAIN LINE
+
   return {
     success: true,
-    message: "OTP generated",
+    message: "OTP sent to email",
+    emailSent: true
+  };
+
+} catch (error) {
+  console.log("❌ EMAIL ERROR:", error);
+
+  return {
+    success: true,
+    message: "OTP generated (email failed)",
     emailSent: false,
     demo_otp: otp
   };
+}
 }
 
   // Verify OTP
