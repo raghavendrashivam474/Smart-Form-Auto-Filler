@@ -9,40 +9,40 @@ const OTPService = require('../services/otpService');
  */
 const sendOTP = async (req, res) => {
   try {
+    console.log("🔥 SEND OTP HIT");
+
     const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required',
-      });
-    }
-
-    if (!email.includes('@') || !email.includes('.')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email address',
+        message: "Email is required",
       });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
     const result = await OTPService.sendOTP(normalizedEmail);
 
-    res.json({
+    console.log("OTP RESULT:", result);
+
+    return res.status(200).json({
       success: true,
-      message: result.emailSent 
-        ? 'OTP sent to ' + normalizedEmail + '. Check your inbox!'
-        : 'OTP generated (check console for demo)',
+      message: result?.emailSent
+        ? `OTP sent to ${normalizedEmail}`
+        : "OTP generated (check logs)",
       data: {
-        emailSent: result.emailSent,
-        ...(result.demo_otp && { demo_otp: result.demo_otp }),
+        emailSent: result?.emailSent || false,
+        demoOtp: result?.demo_otp || null,
       },
     });
+
   } catch (error) {
-    console.error('❌ Send OTP Error:', error);
-    res.status(500).json({
+    console.error("❌ SEND OTP ERROR:", error);
+
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Server error",
     });
   }
 };
