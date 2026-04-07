@@ -25,7 +25,11 @@ class OTPService {
   });
 
   console.log("📦 OTP SAVED IN DB:", email, otp);
-
+  console.log("EMAIL CONFIG:",
+    process.env.EMAIL_USER,
+    process.env.EMAIL_PASS ? "PASS OK" : 
+    "NO PASS");
+    
   return {
     success: true,
     message: "OTP generated",
