@@ -1,4 +1,5 @@
 const EmailService = require('./emailService');
+const OTPModel = require('../models/OTP');
 
 // In-memory OTP storage
 const otpStore = new Map();
@@ -10,71 +11,54 @@ class OTPService {
   }
 
   // Send OTP via Email
-  static async sendOTP(email) {
-    const otp = this.generateOTP();
+ static async sendOTP(email) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store OTP with 5 minute expiry
-    otpStore.set(email, {
-      otp: otp,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-      attempts: 0,
-    });
+  // Delete old OTPs for this email
+  await OTPModel.deleteMany({ email });
 
-    console.log('========================================');
-    console.log('📧 OTP for ' + email + ': ' + otp);
-    console.log('⏰ Expires in 5 minutes');
-    console.log('========================================');
+  // Save new OTP
+  await OTPModel.create({
+    email,
+    otp,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 min
+  });
 
-    // Try sending email
-    try {
-      await EmailService.sendOTPEmail(email, otp);
-      return {
-        success: true,
-        message: 'OTP sent to email',
-        emailSent: true,
-      };
-    } catch (error) {
-      // If email fails, still return OTP for demo
-      console.log('⚠️ Email failed, showing OTP in response for demo');
-      return {
-        success: true,
-        message: 'OTP generated (email delivery failed)',
-        emailSent: false,
-        demo_otp: otp,
-      };
-    }
-  }
+  console.log("📦 OTP SAVED IN DB:", email, otp);
+
+  return {
+    success: true,
+    message: "OTP generated",
+    emailSent: false,
+    demo_otp: otp
+  };
+}
 
   // Verify OTP
-  static verifyOTP(email, otp) {
-    const stored = otpStore.get(email);
+ static async verifyOTP(email, otp) {
+  console.log("🔍 VERIFY:", email, otp);
 
-    if (!stored) {
-      return { success: false, message: 'OTP expired or not found. Request a new one.' };
-    }
+  const record = await OTPModel.findOne({ email });
 
-    if (Date.now() > stored.expiresAt) {
-      otpStore.delete(email);
-      return { success: false, message: 'OTP expired. Request a new one.' };
-    }
+  console.log("📦 DB RECORD:", record);
 
-    if (stored.attempts >= 3) {
-      otpStore.delete(email);
-      return { success: false, message: 'Too many attempts. Request a new OTP.' };
-    }
-
-    stored.attempts++;
-
-    if (stored.otp !== otp) {
-      return { 
-        success: false, 
-        message: 'Invalid OTP. ' + (3 - stored.attempts) + ' attempts remaining.' 
-      };
-    }
-
-    otpStore.delete(email);
-    return { success: true, message: 'OTP verified successfully' };
+  if (!record) {
+    return { success: false, message: "OTP not found" };
   }
+
+  if (record.expiresAt < Date.now()) {
+    return { success: false, message: "OTP expired" };
+  }
+
+  if (record.otp !== otp) {
+    return { success: false, message: "Invalid OTP" };
+  }
+
+  // Optional: delete after success
+  await OTPModel.deleteMany({ email });
+
+  return { success: true };
+}
 }
 
 module.exports = OTPService;
