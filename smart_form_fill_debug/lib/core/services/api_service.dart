@@ -98,56 +98,71 @@ class ApiService {
       return null;
     }
   }
-
-  // Request OTP
+ //send OTP
   Future<Map<String, dynamic>> sendOTP(String email) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sendOTP}'),
-            headers: _headers,
-            body: jsonEncode({'email': email}),
-          )
-          .timeout(ApiConstants.timeout);
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.sendOTP}'),
+          headers: _headers,
+          body: jsonEncode({'email': email}),
+        )
+        .timeout(ApiConstants.timeout);
 
-      final data = jsonDecode(response.body);
+    // ✅ DEBUG (important for now)
+    print("STATUS: ${response.statusCode}");
+    print("BODY: ${response.body}");
 
-      if (response.statusCode == 200 && data['success']) {
-        return data['data'];
-      }
-
-      throw Exception(data['message'] ?? 'OTP request failed');
-    } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+    // ✅ EMPTY CHECK
+    if (response.body.isEmpty) {
+      throw Exception('Empty response from server');
     }
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['success']) {
+      return data['data'];
+    }
+
+    throw Exception(data['message'] ?? 'OTP request failed');
+  } catch (e) {
+    throw Exception('Network error: ${e.toString()}');
   }
+}
 
   // Verify OTP and Login
-  Future<Map<String, dynamic>> login(String email, String otp) async {
-    try {
-      final response = await http
-          .post(
-            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.verifyOTP}'),
-            headers: _headers,
-            body: jsonEncode({
-              'email': email,
-              'otp': otp,
-            }),
-          )
-          .timeout(ApiConstants.timeout);
+Future<Map<String, dynamic>> login(String email, String otp) async {
+  try {
+    final response = await http
+        .post(
+          Uri.parse('${ApiConstants.baseUrl}${ApiConstants.verifyOTP}'),
+          headers: _headers,
+          body: jsonEncode({
+            'email': email,
+            'otp': otp,
+          }),
+        )
+        .timeout(ApiConstants.timeout);
 
-      final data = jsonDecode(response.body);
+    print("LOGIN STATUS: ${response.statusCode}");
+    print("LOGIN BODY: ${response.body}");
 
-      if (response.statusCode == 200 && data['success']) {
-        await saveToken(data['data']['token']);
-        return data['data'];
-      }
-
-      throw Exception(data['message'] ?? 'Login failed');
-    } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+    if (response.body.isEmpty) {
+      throw Exception('Empty response from server');
     }
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['success']) {
+      await saveToken(data['data']['token']);
+      return data['data'];
+    }
+
+    throw Exception(data['message'] ?? 'Login failed');
+  } catch (e) {
+    throw Exception('Network error: ${e.toString()}');
   }
+}
 
   // Get Current User
   Future<User> getCurrentUser() async {
