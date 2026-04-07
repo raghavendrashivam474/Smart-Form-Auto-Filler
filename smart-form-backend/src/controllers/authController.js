@@ -73,8 +73,7 @@ const verifyOTP = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const verification = OTPService.verifyOTP(normalizedEmail, otp);
-
+    const verification = await OTPService.verifyOTP(normalizedEmail, otp);
     if (!verification.success) {
       console.log('❌ OTP verification failed:', verification.message);
       return res.status(400).json({
