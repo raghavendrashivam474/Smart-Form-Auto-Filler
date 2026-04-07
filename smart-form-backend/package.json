@@ -23,6 +23,7 @@
     "nodemailer": "^8.0.4",
     "pdf-parse-new": "^2.0.0",
     "pdfkit": "^0.15.1",
+    "resend": "^6.10.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
