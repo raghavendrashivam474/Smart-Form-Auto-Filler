@@ -4,24 +4,21 @@ const connectDB = require('./src/config/database');
 
 const PORT = process.env.PORT || 5000;
 
+// Connect Database
 connectDB();
 
-const smtpReady = Boolean(
-  process.env.SMTP_HOST &&
-  process.env.SMTP_USER &&
-  process.env.SMTP_PASS
-);
-
+// 🔥 RESEND CHECK (Clean & Correct)
 console.log('========================================');
-console.log('🔐 OTP Mode:', process.env.SKIP_OTP_VERIFICATION === 'true' ? 'Development OTP (shown in app)' : 'SMTP email OTP');
-console.log('✉️  SMTP Ready:', smtpReady ? 'yes' : 'no');
+console.log('📧 Email Mode: Resend API');
+console.log('🔑 Resend Key:', process.env.RESEND_API_KEY ? 'Present ✅' : 'Missing ❌');
 console.log('========================================');
 
+// Start Server
 app.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
   console.log('🚀 Smart Form Backend Server Started');
   console.log('========================================');
   console.log('📍 Port:', PORT);
-  console.log('🌍 Environment:', process.env.NODE_ENV);
+  console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
   console.log('========================================');
 });
